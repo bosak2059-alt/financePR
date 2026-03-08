@@ -1,0 +1,179 @@
+/* =========================================
+   Finance Tracker - Custom Styles
+   ========================================= */
+
+:root {
+    --primary-color: #4e73df;
+    --success-color: #1cc88a;
+    --danger-color: #e74a3b;
+    --dark-bg: #2c3e50;
+    --light-bg: #f8f9fc;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--light-bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Навигация */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+
+/* Карточки */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    transition: transform 0.2s;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #e3e6f0;
+    font-weight: 700;
+    color: var(--primary-color);
+    border-radius: 10px 10px 0 0 !important;
+}
+
+/* Карточки статистики */
+.card-stats {
+    border-left: 4px solid;
+}
+
+.card-stats.primary {
+    border-left-color: var(--primary-color);
+}
+
+.card-stats.success {
+    border-left-color: var(--success-color);
+}
+
+.card-stats.danger {
+    border-left-color: var(--danger-color);
+}
+
+/* Таблицы */
+.table {
+    background-color: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.table thead {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(78, 115, 223, 0.05);
+}
+
+/* Кнопки */
+.btn {
+    border-radius: 5px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #375a7f;
+    border-color: #375a7f;
+}
+
+/* Формы */
+.form-control, .form-select {
+    border-radius: 5px;
+    border: 1px solid #d1d3e2;
+    padding: 0.75rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+/* Алерты */
+.alert {
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+/* Графики */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Бейджи */
+.badge {
+    padding: 0.5em 0.75em;
+    font-weight: 500;
+    border-radius: 5px;
+}
+
+/* Подвал */
+footer {
+    margin-top: auto;
+    background-color: var(--dark-bg) !important;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .card-stats {
+        margin-bottom: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+}
+
+/* Утилиты */
+.text-balance {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.icon-large {
+    font-size: 2rem;
+    opacity: 0.3;
+}
+
+.shadow-custom {
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
