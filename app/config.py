@@ -7,22 +7,23 @@ load_dotenv()
 class Config:
     """Класс конфигурации приложения Flask"""
     
-    # Секретный ключ для сессий и CSRF-защиты
+    # Секретный ключ
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-production'
     
-    # Конфигурация базы данных MySQL
+    # Получаем переменные с значениями по умолчанию
+    MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
+    MYSQL_HOST = os.environ.get('MYSQL_HOST', '127.0.0.1')
+    MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')  # Теперь по умолчанию 3306
+    MYSQL_DB = os.environ.get('MYSQL_DB', 'finance_tracker')
+    
+    # Формируем строку подключения
     SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{os.environ.get('MYSQL_USER')}:"
-        f"{os.environ.get('MYSQL_PASSWORD')}@"
-        f"{os.environ.get('MYSQL_HOST')}:"
-        f"{os.environ.get('MYSQL_PORT')}/"
-        f"{os.environ.get('MYSQL_DB')}"
+        f"mysql+pymysql://{MYSQL_USER}:"
+        f"{MYSQL_PASSWORD}@"
+        f"{MYSQL_HOST}:"
+        f"{MYSQL_PORT}/"
+        f"{MYSQL_DB}"
     )
     
-    # Отключаем отслеживание изменений объектов (экономит ресурсы)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # Настройки сессий
-    SESSION_COOKIE_SECURE = False  # True для HTTPS
-    SESSION_COOKIE_HTTPONLY = True
-    PERMANENT_SESSION_LIFETIME = 3600  # 1 час
