@@ -1,22 +1,23 @@
-from sqlalchemy import create_engine
+import pymysql
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
-DB_URI = (
-    f"mysql+pymysql://{os.environ.get('MYSQL_USER')}:"
-    f"{os.environ.get('MYSQL_PASSWORD')}@"
-    f"{os.environ.get('MYSQL_HOST')}:"
-    f"{os.environ.get('MYSQL_PORT')}/"
-    f"{os.environ.get('MYSQL_DB')}"
-)
+# Загружаем .env из папки base
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'base', '.env'))
 
 try:
-    engine = create_engine(DB_URI)
-    connection = engine.connect()
-    print("✅ УСПЕХ! Python подключился к MySQL.")
+    connection = pymysql.connect(
+        host=os.environ.get('MYSQL_HOST', '127.0.0.1'),
+        port=int(os.environ.get('MYSQL_PORT', 3306)),
+        user=os.environ.get('MYSQL_USER', 'root'),
+        password=os.environ.get('MYSQL_PASSWORD', '1403'),
+        database=os.environ.get('MYSQL_DB', 'finance_tracker')
+    )
+    print("✅ УСПЕХ! Подключение к MySQL работает.")
     connection.close()
-except Exception as e:
-    print("❌ ОШИБКА подключения!")
-    print(f"Детали: {e}")
+except pymysql.err.OperationalError as e:
+    print(f"❌ ОШИБКА: {e}")
+    print("\nВозможные причины:")
+    print("1. Неверный пароль в .env")
+    print("2. Пользователь не имеет доступа с 'localhost'")
+    print("3. База данных не существует")
