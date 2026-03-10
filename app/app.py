@@ -114,7 +114,7 @@ def create_app():
                              category_stats=[{'name': s.name, 'total': float(s.total)} for s in category_stats],
                              trend_stats=trend_stats)
     
-    @app.route('/login', methods=['GET', 'POST'])
+    @app.route('/templates/login', methods=['GET', 'POST'])
     def login():
         """Страница входа"""
         if current_user.is_authenticated:
@@ -133,7 +133,7 @@ def create_app():
         
         return render_template('login.html', form=form)
     
-    @app.route('/register', methods=['GET', 'POST'])
+    @app.route('/templates/register', methods=['GET', 'POST'])
     def register():
         """Страница регистрации"""
         if current_user.is_authenticated:
@@ -154,7 +154,7 @@ def create_app():
         
         return render_template('register.html', form=form)
     
-    @app.route('/logout')
+    @app.route('/templates/logout')
     @login_required
     def logout():
         """Выход из системы"""
@@ -162,7 +162,7 @@ def create_app():
         flash('Вы вышли из системы', 'info')
         return redirect(url_for('login'))
     
-    @app.route('/transaction/add', methods=['GET', 'POST'])
+    @app.route('/templates/add_transaction', methods=['GET', 'POST'])
     @login_required
     def add_transaction():
         """Добавление транзакции"""
@@ -189,7 +189,7 @@ def create_app():
         
         return render_template('add_transaction.html', form=form)
     
-    @app.route('/reports')
+    @app.route('/templates/reports')
     @login_required
     def reports():
         """Страница отчетов"""
