@@ -131,7 +131,7 @@ def create_app():
             else:
                 flash('Неверное имя пользователя или пароль', 'danger')
         
-        return render_template('login.html', form=form)
+        return render_template('/login.html', form=form)
     
     @app.route('/templates/register', methods=['GET', 'POST'])
     def register():
@@ -292,8 +292,51 @@ def create_app():
             db.session.add(category)
         db.session.commit()
     
-    return app
+        return app
 
+    @app.route('/api/category_stats')
+    def api_category_stats():
+        """API: Статистика расходов по категориям за текущий месяц"""
+        stats = db.session.query(
+            Category.name,
+            func.sum(Transaction.amount).label('total')
+        ).join(Transaction).filter(
+            Transaction.category_id == Category.id,
+            Category.type == 'expense',
+            extract('month', Transaction.date) == datetime.now().month,
+            extract('year', Transaction.date) == datetime.now().year
+        ).group_by(Category.name).all()
+        
+        return jsonify([
+            {'name': name, 'total': float(total)} 
+            for name, total in stats
+        ])
+
+    @app.route('/api/trend_stats')
+    def api_trend_stats():
+        """API: Динамика доходов/расходов за последние 6 месяцев"""
+        # Получаем данные за последние 6 месяцев
+        six_months_ago = datetime.now() - timedelta(days=180)
+        
+        trend = db.session.query(
+            func.strftime('%Y-%m', Transaction.date).label('month'),
+            Category.type,
+            func.sum(Transaction.amount).label('total')
+        ).join(Category).filter(
+            Transaction.date >= six_months_ago
+        ).group_by('month', Category.type).all()
+        
+        # Формируем структуру данных для графика
+        result = {}
+        for month, trans_type, total in trend:
+            if month not in result:
+                result[month] = {'month': month, 'income': 0, 'expense': 0}
+            result[month][trans_type] = float(total)
+        
+        # Сортируем по месяцам и возвращаем список
+        return jsonify(sorted(result.values(), key=lambda x: x['month']))
+    
+    return app
 
 if __name__ == '__main__':
     app = create_app()
