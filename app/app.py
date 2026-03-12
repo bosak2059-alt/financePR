@@ -28,8 +28,6 @@ def create_app():
     # Создание таблиц БД при первом запуске
     with app.app_context():
         db.create_all()
-        # Создаем стандартные категории для новых пользователей (опционально)
-        # create_default_categories()
     
     # ================= МАРШРУТЫ =================
     
@@ -40,7 +38,7 @@ def create_app():
         now = datetime.now()
         first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
-        # Расчет баланса через явный JOIN (надёжнее чем .has())
+        # Расчет баланса через явный JOIN
         total_income = db.session.query(func.sum(Transaction.amount))\
             .join(Category).filter(
                 Transaction.user_id == current_user.id,
@@ -55,7 +53,7 @@ def create_app():
 
         balance = float(total_income) - float(total_expense)
 
-        # Доходы и расходы за текущий месяц (также через JOIN)
+        # Доходы и расходы за текущий месяц
         income_month = db.session.query(func.sum(Transaction.amount))\
             .join(Category).filter(
                 Transaction.user_id == current_user.id,
@@ -74,7 +72,7 @@ def create_app():
         transactions = Transaction.query.filter_by(user_id=current_user.id)\
             .order_by(Transaction.date.desc()).limit(10).all()
         
-        # Данные для графика категорий (расходы за месяц)
+        # === Данные для графика категорий ===
         category_stats = db.session.query(
             Category.name, func.sum(Transaction.amount).label('total')
         ).join(Transaction).filter(
@@ -83,23 +81,26 @@ def create_app():
             Transaction.date >= first_day
         ).group_by(Category.name).all()
         
-        # Данные для графика трендов (последние 6 месяцев)
+        category_labels = [s.name for s in category_stats]
+        category_data = [float(s.total) for s in category_stats]
+        
+        # === Данные для графика трендов (6 месяцев) ===
         trend_stats = []
         for i in range(5, -1, -1):
             date = now - timedelta(days=i*30)
             month_start = date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             month_end = (month_start + timedelta(days=32)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            inc = db.session.query(func.sum(Transaction.amount)).filter(
+            inc = db.session.query(func.sum(Transaction.amount)).join(Category).filter(
                 Transaction.user_id == current_user.id,
-                Transaction.category.has(type='income'),
+                Category.type == 'income',
                 Transaction.date >= month_start,
                 Transaction.date < month_end
             ).scalar() or 0
             
-            exp = db.session.query(func.sum(Transaction.amount)).filter(
+            exp = db.session.query(func.sum(Transaction.amount)).join(Category).filter(
                 Transaction.user_id == current_user.id,
-                Transaction.category.has(type='expense'),
+                Category.type == 'expense',
                 Transaction.date >= month_start,
                 Transaction.date < month_end
             ).scalar() or 0
@@ -109,18 +110,24 @@ def create_app():
                 'income': float(inc),
                 'expense': float(exp)
             })
+
+        trend_labels = [t['month'] for t in trend_stats]
+        trend_income = [t['income'] for t in trend_stats]
+        trend_expense = [t['expense'] for t in trend_stats]
         
         return render_template('index.html',
                              balance=balance,
                              income_month=float(income_month),
                              expense_month=float(expense_month),
                              transactions=transactions,
-                             category_stats=[{'name': s.name, 'total': float(s.total)} for s in category_stats],
-                             trend_stats=trend_stats)
+                             category_labels=category_labels,
+                             category_data=category_data,
+                             trend_labels=trend_labels,
+                             trend_income=trend_income,
+                             trend_expense=trend_expense)
     
     @app.route('/templates/login', methods=['GET', 'POST'])
     def login():
-        """Страница входа"""
         if current_user.is_authenticated:
             return redirect(url_for('index'))
         
@@ -135,11 +142,10 @@ def create_app():
             else:
                 flash('Неверное имя пользователя или пароль', 'danger')
         
-        return render_template('/login.html', form=form)
+        return render_template('login.html', form=form)
     
     @app.route('/templates/register', methods=['GET', 'POST'])
     def register():
-        """Страница регистрации"""
         if current_user.is_authenticated:
             return redirect(url_for('index'))
         
@@ -150,7 +156,6 @@ def create_app():
             db.session.add(user)
             db.session.commit()
             
-            # Создаем стандартные категории для нового пользователя
             create_default_categories(user.id)
             
             flash('Регистрация успешна! Теперь вы можете войти', 'success')
@@ -161,7 +166,6 @@ def create_app():
     @app.route('/templates/logout')
     @login_required
     def logout():
-        """Выход из системы"""
         logout_user()
         flash('Вы вышли из системы', 'info')
         return redirect(url_for('login'))
@@ -172,7 +176,7 @@ def create_app():
         form = TransactionForm()
         
         if request.method == 'POST':
-            trans_type = request.form.get('type', 'expense')  # читаем из поля type формы
+            trans_type = request.form.get('type', 'expense')
         else:
             trans_type = request.args.get('type', 'expense')
         
@@ -192,23 +196,18 @@ def create_app():
             return redirect(url_for('index'))
         
         return render_template('add_transaction.html', form=form)
-    
-    
+
     @app.route('/templates/reports')
     @login_required
     def reports():
-        """Страница отчетов"""
-        # Получаем параметры фильтра
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         category_id = request.args.get('category')
         page = request.args.get('page', 1, type=int)
         
-        # Базовый запрос
         query = Transaction.query.filter_by(user_id=current_user.id)\
             .order_by(Transaction.date.desc())
         
-        # Применяем фильтры
         if date_from:
             query = query.filter(Transaction.date >= datetime.strptime(date_from, '%Y-%m-%d'))
         if date_to:
@@ -216,14 +215,10 @@ def create_app():
         if category_id and category_id != '':
             query = query.filter_by(category_id=int(category_id))
         
-        # Пагинация
         pagination = query.paginate(page=page, per_page=20, error_out=False)
         transactions = pagination.items
-        
-        # Список категорий для фильтра
         categories = Category.query.filter_by(user_id=current_user.id).all()
         
-        # Общая сумма по фильтру
         total = db.session.query(func.sum(Transaction.amount)).filter(
             Transaction.user_id == current_user.id,
             *([Transaction.date >= datetime.strptime(date_from, '%Y-%m-%d')] if date_from else []),
@@ -244,7 +239,6 @@ def create_app():
     @app.route('/transaction/edit/<int:id>', methods=['GET', 'POST'])
     @login_required
     def edit_transaction(id):
-        """Редактирование транзакции"""
         transaction = Transaction.query.get_or_404(id)
         if transaction.user_id != current_user.id:
             flash('Доступ запрещен', 'danger')
@@ -267,7 +261,6 @@ def create_app():
     @app.route('/transaction/delete/<int:id>')
     @login_required
     def delete_transaction(id):
-        """Удаление транзакции"""
         transaction = Transaction.query.get_or_404(id)
         if transaction.user_id != current_user.id:
             flash('Доступ запрещен', 'danger')
@@ -277,11 +270,10 @@ def create_app():
         db.session.commit()
         flash('Транзакция удалена', 'success')
         return redirect(url_for('reports'))
-    
+
     # ================= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =================
     
     def create_default_categories(user_id):
-        """Создает стандартные категории для нового пользователя"""
         defaults = [
             ('Зарплата', 'income'),
             ('Подработка', 'income'),
@@ -296,18 +288,15 @@ def create_app():
             category = Category(user_id=user_id, name=name, type=type_)
             db.session.add(category)
         db.session.commit()
-    
-        return app
 
     @app.route('/api/category_stats')
-    @login_required  # ← ДОБАВЛЕНО
+    @login_required
     def api_category_stats():
-        """API: Статистика расходов по категориям за текущий месяц"""
         stats = db.session.query(
             Category.name,
             func.sum(Transaction.amount).label('total')
         ).join(Transaction).filter(
-            Transaction.user_id == current_user.id,  # ← ДОБАВЛЕНО
+            Transaction.user_id == current_user.id,
             Transaction.category_id == Category.id,
             Category.type == 'expense',
             extract('month', Transaction.date) == datetime.now().month,
@@ -320,9 +309,8 @@ def create_app():
         ])
 
     @app.route('/api/trend_stats')
-    @login_required  # ← ДОБАВЛЕНО
+    @login_required
     def api_trend_stats():
-        """API: Динамика доходов/расходов за последние 6 месяцев"""
         six_months_ago = datetime.now() - timedelta(days=180)
         
         trend = db.session.query(
@@ -330,7 +318,7 @@ def create_app():
             Category.type,
             func.sum(Transaction.amount).label('total')
         ).join(Category).filter(
-            Transaction.user_id == current_user.id,  # ← ДОБАВЛЕНО
+            Transaction.user_id == current_user.id,
             Transaction.date >= six_months_ago
         ).group_by('month', Category.type).all()
         

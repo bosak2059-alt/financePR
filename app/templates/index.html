@@ -3,28 +3,29 @@
 {% block title %}Дашборд - Finance Tracker{% endblock %}
 
 {% block content %}
+<!-- Карточки статистики -->
 <div class="row mb-4">
     <div class="col-md-4">
-        <div class="card text-white bg-primary mb-3">
+        <div class="card card-stats primary">
             <div class="card-body">
-                <h5 class="card-title">Общий баланс</h5>
-                <h2 class="card-text">{{ "%.2f"|format(balance) }} ₽</h2>
+                <h5 class="card-title text-uppercase">Общий баланс</h5>
+                <h2 class="text-balance">{{ "%.2f"|format(balance) }} ₽</h2>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-white bg-success mb-3">
+        <div class="card card-stats success">
             <div class="card-body">
-                <h5 class="card-title">Доходы (месяц)</h5>
-                <h2 class="card-text">{{ "%.2f"|format(income_month) }} ₽</h2>
+                <h5 class="card-title text-uppercase">Доходы (месяц)</h5>
+                <h2 class="text-balance text-success">{{ "%.2f"|format(income_month) }} ₽</h2>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-white bg-danger mb-3">
+        <div class="card card-stats danger">
             <div class="card-body">
-                <h5 class="card-title">Расходы (месяц)</h5>
-                <h2 class="card-text">{{ "%.2f"|format(expense_month) }} ₽</h2>
+                <h5 class="card-title text-uppercase">Расходы (месяц)</h5>
+                <h2 class="text-balance text-danger">{{ "%.2f"|format(expense_month) }} ₽</h2>
             </div>
         </div>
     </div>
@@ -34,17 +35,25 @@
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">Расходы по категориям</div>
+            <div class="card-header">
+                <i class="bi bi-pie-chart"></i> Расходы по категориям
+            </div>
             <div class="card-body">
-                <canvas id="categoryChart"></canvas>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">Динамика за 6 месяцев</div>
+            <div class="card-header">
+                <i class="bi bi-graph-up"></i> Динамика за 6 месяцев
+            </div>
             <div class="card-body">
-                <canvas id="trendChart"></canvas>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -53,44 +62,63 @@
 <!-- Последние транзакции -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Последние операции</h5>
-        <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-primary">Все транзакции</a>
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Последние операции</h5>
+        <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-table"></i> Все транзакции
+        </a>
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover" id="transactionsTable">
                 <thead>
                     <tr>
-                        <th>Дата</th>
+                        <th class="text-nowrap">Дата</th>
                         <th>Категория</th>
                         <th>Описание</th>
-                        <th>Сумма</th>
-                        <th>Действия</th>
+                        <th class="text-end">Сумма</th>
+                        <th class="text-center">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for transaction in transactions %}
                     <tr>
-                        <td>{{ transaction.date.strftime('%d.%m.%Y') }}</td>
+                        <td class="text-nowrap">
+                            <i class="bi bi-calendar3 text-muted"></i>
+                            {{ transaction.date.strftime('%d.%m.%Y') }}
+                        </td>
                         <td>
                             <span class="badge {% if transaction.category.type == 'income' %}bg-success{% else %}bg-danger{% endif %}">
                                 {{ transaction.category.name }}
                             </span>
                         </td>
-                        <td>{{ transaction.description }}</td>
-                        <td class="{% if transaction.category.type == 'income' %}text-success{% else %}text-danger{% endif %}">
-                            {% if transaction.category.type == 'income' %}+{% else %}-{% endif %}
-                            {{ "%.2f"|format(transaction.amount) }} ₽
+                        <td class="text-truncate" style="max-width: 200px;">
+                            {{ transaction.description or '—' }}
                         </td>
-                        <td>
-                            <a href="{{ url_for('edit_transaction', id=transaction.id) }}" class="btn btn-sm btn-outline-secondary">
+                        <td class="text-end {% if transaction.category.type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                            <strong>
+                                {% if transaction.category.type == 'income' %}+{% else %}-{% endif %}
+                                {{ "%.2f"|format(transaction.amount) }} ₽
+                            </strong>
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('edit_transaction', id=transaction.id) }}" 
+                               class="btn btn-sm btn-outline-secondary" 
+                               title="Редактировать">
                                 <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('delete_transaction', id=transaction.id) }}" 
+                               class="btn btn-sm btn-outline-danger btn-delete" 
+                               title="Удалить">
+                                <i class="bi bi-trash"></i>
                             </a>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center">Транзакций пока нет</td>
+                        <td colspan="5" class="text-center py-4">
+                            <i class="bi bi-inbox icon-large"></i>
+                            <p class="text-muted mb-0">Транзакций пока нет</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -100,116 +128,14 @@
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
 <script>
-    // Функция для безопасного получения данных через Fetch
-    async function fetchDashboardData() {
-        try {
-            const [categoryRes, trendRes] = await Promise.all([
-                fetch('{{ url_for("api_category_stats") }}'),
-                fetch('{{ url_for("api_trend_stats") }}')
-            ]);
-            
-            if (!categoryRes.ok || !trendRes.ok) {
-                throw new Error('Ошибка загрузки данных для графиков');
-            }
-            
-            const categoryData = await categoryRes.json();
-            const trendData = await trendRes.json();
-            
-            return { categoryData, trendData };
-        } catch (error) {
-            console.error('Ошибка при загрузке данных:', error);
-            // Fallback: пустые массивы, чтобы не ломать интерфейс
-            return { categoryData: [], trendData: [] };
-        }
-    }
-
-    // Инициализация графиков после загрузки данных
-    async function initCharts() {
-        const { categoryData, trendData } = await fetchDashboardData();
-        
-        // График категорий (Круговая диаграмма)
-        if (categoryData && categoryData.length > 0) {
-            new Chart(document.getElementById('categoryChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: categoryData.map(item => item.name),
-                    datasets: [{
-                        data: categoryData.map(item => item.total),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'],
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.raw || 0;
-                                    return `${label}: ${value.toFixed(2)} ₽`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        } else {
-            // Показать заглушку, если данных нет
-            const ctx = document.getElementById('categoryChart');
-            ctx.parentNode.innerHTML = '<p class="text-muted text-center mb-0">Нет данных для отображения</p>';
-        }
-        
-        // График трендов (Линейный)
-        if (trendData && trendData.length > 0) {
-            new Chart(document.getElementById('trendChart'), {
-                type: 'line',
-                data: {
-                    labels: trendData.map(item => item.month),
-                    datasets: [{
-                        label: 'Расходы',
-                        data: trendData.map(item => item.expense),
-                        borderColor: '#FF6384',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }, {
-                        label: 'Доходы',
-                        data: trendData.map(item => item.income),
-                        borderColor: '#36A2EB',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    interaction: { mode: 'index', intersect: false },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) { return value + ' ₽'; }
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            });
-        } else {
-            const ctx = document.getElementById('trendChart');
-            ctx.parentNode.innerHTML = '<p class="text-muted text-center mb-0">Нет данных для отображения</p>';
-        }
-    }
-
-    // Запускаем инициализацию после загрузки DOM
-    document.addEventListener('DOMContentLoaded', initCharts);
+    // Передаем данные из Flask в JavaScript для графиков
+    window.categoryLabels = {{ category_labels | tojson }};
+    window.categoryData = {{ category_data | tojson }};
+    
+    window.trendLabels = {{ trend_labels | tojson }};
+    window.trendIncome = {{ trend_income | tojson }};
+    window.trendExpense = {{ trend_expense | tojson }};
 </script>
 {% endblock %}
