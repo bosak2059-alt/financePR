@@ -40,31 +40,35 @@ def create_app():
         now = datetime.now()
         first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
-        # Расчет баланса (все доходы - все расходы)
-        total_income = db.session.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == current_user.id,
-            Transaction.category.has(type='income')
-        ).scalar() or 0
-        
-        total_expense = db.session.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == current_user.id,
-            Transaction.category.has(type='expense')
-        ).scalar() or 0
-        
+        # Расчет баланса через явный JOIN (надёжнее чем .has())
+        total_income = db.session.query(func.sum(Transaction.amount))\
+            .join(Category).filter(
+                Transaction.user_id == current_user.id,
+                Category.type == 'income'
+            ).scalar() or 0
+
+        total_expense = db.session.query(func.sum(Transaction.amount))\
+            .join(Category).filter(
+                Transaction.user_id == current_user.id,
+                Category.type == 'expense'
+            ).scalar() or 0
+
         balance = float(total_income) - float(total_expense)
-        
-        # Доходы и расходы за текущий месяц
-        income_month = db.session.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == current_user.id,
-            Transaction.category.has(type='income'),
-            Transaction.date >= first_day
-        ).scalar() or 0
-        
-        expense_month = db.session.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == current_user.id,
-            Transaction.category.has(type='expense'),
-            Transaction.date >= first_day
-        ).scalar() or 0
+
+        # Доходы и расходы за текущий месяц (также через JOIN)
+        income_month = db.session.query(func.sum(Transaction.amount))\
+            .join(Category).filter(
+                Transaction.user_id == current_user.id,
+                Category.type == 'income',
+                Transaction.date >= first_day
+            ).scalar() or 0
+
+        expense_month = db.session.query(func.sum(Transaction.amount))\
+            .join(Category).filter(
+                Transaction.user_id == current_user.id,
+                Category.type == 'expense',
+                Transaction.date >= first_day
+            ).scalar() or 0
         
         # Последние 10 транзакций
         transactions = Transaction.query.filter_by(user_id=current_user.id)\
@@ -165,14 +169,14 @@ def create_app():
     @app.route('/templates/add_transaction', methods=['GET', 'POST'])
     @login_required
     def add_transaction():
-        """Добавление транзакции"""
         form = TransactionForm()
-        form.populate_categories(current_user.id, 'expense')
         
-        # Обновляем выбор категорий при смене типа операции (через JS лучше, но здесь для примера)
-        if request.method == 'GET':
+        if request.method == 'POST':
+            trans_type = request.form.get('type', 'expense')  # читаем из поля type формы
+        else:
             trans_type = request.args.get('type', 'expense')
-            form.populate_categories(current_user.id, trans_type)
+        
+        form.populate_categories(current_user.id, trans_type)
         
         if form.validate_on_submit():
             transaction = Transaction(
@@ -188,6 +192,7 @@ def create_app():
             return redirect(url_for('index'))
         
         return render_template('add_transaction.html', form=form)
+    
     
     @app.route('/templates/reports')
     @login_required
@@ -295,12 +300,14 @@ def create_app():
         return app
 
     @app.route('/api/category_stats')
+    @login_required  # ← ДОБАВЛЕНО
     def api_category_stats():
         """API: Статистика расходов по категориям за текущий месяц"""
         stats = db.session.query(
             Category.name,
             func.sum(Transaction.amount).label('total')
         ).join(Transaction).filter(
+            Transaction.user_id == current_user.id,  # ← ДОБАВЛЕНО
             Transaction.category_id == Category.id,
             Category.type == 'expense',
             extract('month', Transaction.date) == datetime.now().month,
@@ -313,9 +320,9 @@ def create_app():
         ])
 
     @app.route('/api/trend_stats')
+    @login_required  # ← ДОБАВЛЕНО
     def api_trend_stats():
         """API: Динамика доходов/расходов за последние 6 месяцев"""
-        # Получаем данные за последние 6 месяцев
         six_months_ago = datetime.now() - timedelta(days=180)
         
         trend = db.session.query(
@@ -323,17 +330,16 @@ def create_app():
             Category.type,
             func.sum(Transaction.amount).label('total')
         ).join(Category).filter(
+            Transaction.user_id == current_user.id,  # ← ДОБАВЛЕНО
             Transaction.date >= six_months_ago
         ).group_by('month', Category.type).all()
         
-        # Формируем структуру данных для графика
         result = {}
         for month, trans_type, total in trend:
             if month not in result:
                 result[month] = {'month': month, 'income': 0, 'expense': 0}
             result[month][trans_type] = float(total)
         
-        # Сортируем по месяцам и возвращаем список
         return jsonify(sorted(result.values(), key=lambda x: x['month']))
     
     return app
