@@ -1,49 +1,63 @@
+# Импорт ядра Flask, инструментов маршрутизации, работы с сессиями, шаблонами и запросами
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
+# Импорт менеджера аутентификации и декораторов для контроля доступа
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+# Импорт конфигурации, БД, моделей и форм
 from config import Config
 from models import db, User, Category, Transaction, Budget
 from forms import LoginForm, RegistrationForm, TransactionForm, BudgetForm
+# Импорт агрегатных функций и инструментов извлечения частей даты из SQLAlchemy
 from sqlalchemy import func, extract, and_
+# Импорт типов для работы с датами и точными числами
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 def create_app():
+    """
+    Функция-фабрика приложения. Создает экземпляр Flask, применяет конфигурацию, инициализирует расширения и регистрирует маршруты.
+    Позволяет гибко тестировать приложение и создавать несколько экземпляров в разных окружениях.
+    """
     app = Flask(__name__)
     app.config.from_object(Config)
-    
-    # Инициализация расширений
+
+    # Привязка ORM к приложению
     db.init_app(app)
-    
-    # Настройка LoginManager
+
+    # Настройка менеджера авторизации: указывает маршрут для редиректа неавторизованных и сообщения
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'login'
     login_manager.login_message = 'Пожалуйста, войдите для доступа к этой странице'
     login_manager.login_message_category = 'warning'
-    
+
     @login_manager.user_loader
     def load_user(user_id):
+        """Загружает объект пользователя из БД по ID, сохраненному в сессии. Обязателен для работы Flask-Login"""
         return User.query.get(int(user_id))
-    
-    # Создание таблиц БД при первом запуске
+
+    # Создание всех таблиц в БД на основе моделей при первом запуске приложения
     with app.app_context():
         db.create_all()
-    
+
     # ================= МАРШРУТЫ =================
-    
+
     @app.route('/')
     @login_required
     def index():
-        """Главная страница - Дашборд"""
+        """
+        Главная страница (Дашборд). Требует авторизации.
+        Рассчитывает общий баланс, доходы/расходы за текущий месяц, выбирает последние транзакции.
+        Агрегирует данные для отрисовки графиков (распределение по категориям и тренды за 6 месяцев).
+        """
         now = datetime.now()
         first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
-        # Расчет баланса через явный JOIN
+        # Расчет общего баланса через явный JOIN с категориями для фильтрации по типу (доход/расход)
         total_income = db.session.query(func.sum(Transaction.amount))\
             .join(Category).filter(
                 Transaction.user_id == current_user.id,
                 Category.type == 'income'
-            ).scalar() or 0
+            ).scalar() or 0 
 
         total_expense = db.session.query(func.sum(Transaction.amount))\
             .join(Category).filter(
@@ -53,7 +67,7 @@ def create_app():
 
         balance = float(total_income) - float(total_expense)
 
-        # Доходы и расходы за текущий месяц
+        # Доходы и расходы строго за текущий календарный месяц
         income_month = db.session.query(func.sum(Transaction.amount))\
             .join(Category).filter(
                 Transaction.user_id == current_user.id,
@@ -68,14 +82,14 @@ def create_app():
                 Transaction.date >= first_day
             ).scalar() or 0
         
-        # Последние 10 транзакций
+        # Последние 10 транзакций, отсортированные по дате (новые сверху)
         transactions = Transaction.query.filter_by(user_id=current_user.id)\
             .order_by(Transaction.date.desc()).limit(10).all()
         
-        # === Данные для графика категорий ===
+        # Данные для круговой/столбчатой диаграммы расходов по категориям за месяц
         category_stats = db.session.query(
             Category.name, func.sum(Transaction.amount).label('total')
-        ).join(Transaction).filter(
+         ).join(Transaction).filter(
             Transaction.user_id == current_user.id,
             Transaction.category.has(type='expense'),
             Transaction.date >= first_day
@@ -84,7 +98,7 @@ def create_app():
         category_labels = [s.name for s in category_stats]
         category_data = [float(s.total) for s in category_stats]
         
-        # === Данные для графика трендов (6 месяцев) ===
+        # Данные для линейного графика трендов доходов/расходов за последние 6 месяцев
         trend_stats = []
         for i in range(5, -1, -1):
             date = now - timedelta(days=i*30)
@@ -99,7 +113,7 @@ def create_app():
             ).scalar() or 0
             
             exp = db.session.query(func.sum(Transaction.amount)).join(Category).filter(
-                Transaction.user_id == current_user.id,
+                Transaction.user_id == current_user.id, 
                 Category.type == 'expense',
                 Transaction.date >= month_start,
                 Transaction.date < month_end
@@ -125,9 +139,10 @@ def create_app():
                              trend_labels=trend_labels,
                              trend_income=trend_income,
                              trend_expense=trend_expense)
-    
-    @app.route('/templates/login', methods=['GET', 'POST'])
+
+    @app.route('/login', methods=['GET', 'POST'])
     def login():
+        """Маршрут авторизации. При успешной проверке логина/пароля создает сессию пользователя."""
         if current_user.is_authenticated:
             return redirect(url_for('index'))
         
@@ -143,9 +158,10 @@ def create_app():
                 flash('Неверное имя пользователя или пароль', 'danger')
         
         return render_template('login.html', form=form)
-    
-    @app.route('/templates/register', methods=['GET', 'POST'])
+
+    @app.route('/register', methods=['GET', 'POST'])
     def register():
+        """Маршрут регистрации. Создает нового пользователя, хеширует пароль и автоматически генерирует стандартные категории."""
         if current_user.is_authenticated:
             return redirect(url_for('index'))
         
@@ -162,17 +178,19 @@ def create_app():
             return redirect(url_for('login'))
         
         return render_template('register.html', form=form)
-    
-    @app.route('/templates/logout')
+
+    @app.route('/logout')
     @login_required
     def logout():
+        """Разрывает сессию текущего пользователя и перенаправляет на страницу входа."""
         logout_user()
         flash('Вы вышли из системы', 'info')
         return redirect(url_for('login'))
-    
-    @app.route('/templates/add_transaction', methods=['GET', 'POST'])
+
+    @app.route('/add_transaction', methods=['GET', 'POST'])
     @login_required
     def add_transaction():
+        """Маршрут добавления транзакции. Динамически подгружает категории в зависимости от выбранного типа (доход/расход)."""
         form = TransactionForm()
         
         if request.method == 'POST':
@@ -197,9 +215,13 @@ def create_app():
         
         return render_template('add_transaction.html', form=form)
 
-    @app.route('/templates/reports')
+    @app.route('/reports')
     @login_required
     def reports():
+        """
+        Страница отчетов и истории транзакций.
+        Поддерживает фильтрацию по датам и категории, а также постраничную навигацию (пагинацию).
+        """
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         category_id = request.args.get('category')
@@ -219,6 +241,7 @@ def create_app():
         transactions = pagination.items
         categories = Category.query.filter_by(user_id=current_user.id).all()
         
+        # Подсчет общей суммы по текущим фильтрам для отображения в шапке отчета
         total = db.session.query(func.sum(Transaction.amount)).filter(
             Transaction.user_id == current_user.id,
             *([Transaction.date >= datetime.strptime(date_from, '%Y-%m-%d')] if date_from else []),
@@ -235,10 +258,11 @@ def create_app():
                              pagination=pagination,
                              current_page=page,
                              pages=pagination.pages)
-    
+
     @app.route('/transaction/edit/<int:id>', methods=['GET', 'POST'])
     @login_required
     def edit_transaction(id):
+        """Маршрут редактирования транзакции. Проверяет принадлежность записи текущему пользователю для безопасности."""
         transaction = Transaction.query.get_or_404(id)
         if transaction.user_id != current_user.id:
             flash('Доступ запрещен', 'danger')
@@ -257,10 +281,11 @@ def create_app():
             return redirect(url_for('reports'))
         
         return render_template('add_transaction.html', form=form, edit=True)
-    
+
     @app.route('/transaction/delete/<int:id>')
     @login_required
     def delete_transaction(id):
+        """Маршрут удаления транзакции. Аналогично редактированию, проверяет владельца записи."""
         transaction = Transaction.query.get_or_404(id)
         if transaction.user_id != current_user.id:
             flash('Доступ запрещен', 'danger')
@@ -272,17 +297,17 @@ def create_app():
         return redirect(url_for('reports'))
 
     # ================= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =================
-    
+
     def create_default_categories(user_id):
+        """
+        Автоматически создает базовый набор категорий для нового пользователя.
+        Вызывается один раз при регистрации, чтобы интерфейс не был пустым.
+        """
         defaults = [
-            ('Зарплата', 'income'),
-            ('Подработка', 'income'),
-            ('Еда', 'expense'),
-            ('Транспорт', 'expense'),
-            ('Жилье', 'expense'),
-            ('Развлечения', 'expense'),
-            ('Здоровье', 'expense'),
-            ('Одежда', 'expense'),
+            ('Зарплата', 'income'), ('Подработка', 'income'),
+            ('Еда', 'expense'), ('Транспорт', 'expense'),
+            ('Жилье', 'expense'), ('Развлечения', 'expense'),
+            ('Здоровье', 'expense'), ('Одежда', 'expense'),
         ]
         for name, type_ in defaults:
             category = Category(user_id=user_id, name=name, type=type_)
@@ -292,6 +317,10 @@ def create_app():
     @app.route('/api/category_stats')
     @login_required
     def api_category_stats():
+        """
+        REST API эндпоинт. Возвращает JSON с суммами расходов по категориям за текущий месяц.
+        Используется фронтенд-скриптами для динамической отрисовки графиков без перезагрузки страницы.
+        """
         stats = db.session.query(
             Category.name,
             func.sum(Transaction.amount).label('total')
@@ -302,7 +331,7 @@ def create_app():
             extract('month', Transaction.date) == datetime.now().month,
             extract('year', Transaction.date) == datetime.now().year
         ).group_by(Category.name).all()
-        
+         
         return jsonify([
             {'name': name, 'total': float(total)} 
             for name, total in stats
@@ -311,11 +340,15 @@ def create_app():
     @app.route('/api/trend_stats')
     @login_required
     def api_trend_stats():
+        """
+        REST API эндпоинт. Возвращает JSON с доходами и расходами за последние 6 месяцев.
+        Группирует данные по месяцам и типам транзакций для построения линейного графика трендов.
+        """
         six_months_ago = datetime.now() - timedelta(days=180)
         
         trend = db.session.query(
             func.strftime('%Y-%m', Transaction.date).label('month'),
-            Category.type,
+            Category.type, 
             func.sum(Transaction.amount).label('total')
         ).join(Category).filter(
             Transaction.user_id == current_user.id,
@@ -329,9 +362,10 @@ def create_app():
             result[month][trans_type] = float(total)
         
         return jsonify(sorted(result.values(), key=lambda x: x['month']))
-    
+
     return app
 
 if __name__ == '__main__':
+    # Запуск приложения в режиме отладки на порту 5000. Только для локальной разработки.
     app = create_app()
     app.run(debug=True, port=5000)
