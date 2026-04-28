@@ -183,12 +183,14 @@ __LoginForm__ и __RegistrationForm__
 3. validate_username, validate_email – кастомные валидаторы. WTForms автоматически вызывает методы validate_<имя_поля>(), если они существуют. Они делают запрос к БД, чтобы не допустить дубликатов.
 
 __TransactionForm__
+```
 class TransactionForm(FlaskForm):
     type = SelectField(...)
     category = SelectField(..., coerce=int)
     amount = DecimalField(..., places=2)
     date = DateField(..., format='%Y-%m-%d')
     description = TextAreaField(...)
+```
 
 __Для чего__: coerce=int автоматически преобразует выбранный id категории из строки в число. places=2 ограничивает деньги двумя знаками после запятой.
 __populate_categories(self, user_id, trans_type)__ – ключевой метод. Вместо статического списка категорий он делает запрос Category.query.filter_by(...) и подставляет только нужные варианты (доходы/расходы) конкретного пользователя. Это предотвращает XSS и логические ошибки при выборе чужих категорий.
@@ -203,29 +205,34 @@ __BudgetForm__
 __Назначение__
 Определяет структуру реляционной базы данных, связи между таблицами, правила целостности данных и методы работы с ними на уровне объектов Python.
 
-
+```
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
+```
 1. SQLAlchemy() – экземпляр ORM. Инициализируется глобально, привязывается к приложению в create_app() через db.init_app(app).
 2. UserMixin – добавляет методы is_authenticated, is_active, is_anonymous, get_id(), требуемые Flask-Login.
 
 __User (Пользователь)__
-tablename = 'users'  # ⚠️ Должно быть __tablename__ = 'users'
+```
+tablename = 'users' 
 username = db.Column(db.String(80), unique=True, nullable=False, index=True)
 password_hash = db.Column(db.String(255), nullable=False)
+```
 
 1. index=True – создаёт B-Tree индекс для ускорения поиска по логину/email.
 2. transactions = db.relationship(..., cascade='all, delete-orphan') – важная настройка. При удалении пользователя автоматически удаляются все его транзакции, категории и бюджеты. Предотвращает ForeignKeyViolation.
 3. set_password / check_password – используют werkzeug.security для хеширования (PBKDF2). Пароли никогда не хранятся в открытом виде.
 
 __Category (Категория)__
+```
 type = db.Column(db.String(10), nullable=False)  # 'income' или 'expense'
 icon = db.Column(db.String(50), default='bi-circle')
 __table_args__ = (
     db.UniqueConstraint('user_id', 'name', 'type', name='unique_user_category'),
 )
+```
 
 __Для чего__: UniqueConstraint гарантирует, что у одного пользователя не будет двух категорий с одинаковым именем и типом (например, две "Еды" типа expense).
 __icon__ – резерв под Bootstrap Icons для фронтенда.
