@@ -1,13 +1,15 @@
 # app.py
 ## 1 Импорты и зависимости
-from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from config import Config
-from models import db, User, Category, Transaction, Budget
-from forms import LoginForm, RegistrationForm, TransactionForm, BudgetForm
-from sqlalchemy import func, extract, and_
-from datetime import datetime, timedelta
-from decimal import Decimal
+```
+    from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
+    from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+    from config import Config
+    from models import db, User, Category, Transaction, Budget
+    from forms import LoginForm, RegistrationForm, TransactionForm, BudgetForm
+    from sqlalchemy import func, extract, and_
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+```
 
 Для чего:
 1. __flask__ – основной фреймворк для маршрутизации, рендеринга шаблонов, работы с HTTP-запросами и flash-сообщениями.
