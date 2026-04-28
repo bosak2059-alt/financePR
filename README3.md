@@ -169,9 +169,11 @@ __Для чего__: Резервирует папку для будущих ф�
 __Назначение__
 Описывает структуры веб-форм с помощью Flask-WTF/WTForms. Обеспечивает автоматическую CSRF-защиту, валидацию данных на сервере, безопасное преобразование типов и динамическое наполнение выпадающих списков.
 
-```from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, DecimalField, ...
-from wtforms.validators import DataRequired, Email, EqualTo, ...```
+```
+    from flask_wtf import FlaskForm
+    from wtforms import StringField, PasswordField, DecimalField, ...
+    from wtforms.validators import DataRequired, Email, EqualTo, ...
+```
 
 __Для чего__: FlaskForm автоматически добавляет скрытое поле csrf_token в каждую форму. validators проверяют данные до попадания в бизнес-логику.
 
