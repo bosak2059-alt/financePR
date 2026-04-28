@@ -23,23 +23,25 @@
 5. __datetime__, __timedelta__, __Decimal__ – работа с датами, расчёт периодов и точные финансовые вычисления (избегание ошибок плавающей запятой).
 
 ## 2 Создание приложения и инициализация (create_app)
-def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    db.init_app(app)
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'login'
-    login_manager.login_message = 'Пожалуйста, войдите для доступа к этой странице'
-    login_manager.login_message_category = 'warning'
+```
+    def create_app():
+        app = Flask(__name__)
+        app.config.from_object(Config)
+        db.init_app(app)
+        login_manager = LoginManager()
+        login_manager.init_app(app)
+        login_manager.login_view = 'login'
+        login_manager.login_message = 'Пожалуйста, войдите для доступа к этой странице'
+        login_manager.login_message_category = 'warning'
 
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
+        @login_manager.user_loader
+        def load_user(user_id):
+            return User.query.get(int(user_id))
 
-    with app.app_context():
-        db.create_all()
-    ...
+        with app.app_context():
+            db.create_all()
+        ...
+```
 
 Для чего:
 1. Factory-паттерн: Функция create_app() создаёт экземпляр Flask. Это стандарт для тестирования и разделения окружений (dev/prod).
@@ -55,11 +57,12 @@ def create_app():
 6. with app.app_context(): db.create_all() – автоматически создаёт таблицы в БД при первом запуске.
 
 ## 3 Основные маршруты (Routes)
-Главная страница / Дашборд (/)
-@app.route('/')
-@login_required
-def index():
-
+**Главная страница / Дашборд (/)**
+```
+    @app.route('/')
+    @login_required
+    def index():
+```
 Для чего: **Отображает сводку финансов.**
 1. Считает общий баланс: SUM(income) - SUM(expense) через JOIN Category.
 
@@ -81,12 +84,12 @@ def index():
 3. /logout: Очищает сессию (logout_user) и перенаправляет на вход.
 
 **Управление транзакциями**
-1. /add_transaction:
+1. __/add_transaction__:
     (a)Определяет тип (income/expense) из формы или URL.
     (b)form.populate_categories(...) – динамически подгружает только нужные категории в форму.
     (c)При валидации создаёт объект Transaction, сохраняет, коммитит, показывает flash-сообщение.
 
-2. /transaction/edit/<id> и /transaction/delete/<id>:
+2. __/transaction/edit/<id>__ и __/transaction/delete/<id>__:
     (a)Проверяют права: if transaction.user_id != current_user.id: flash(...); return redirect(...) (защита от редактирования чужих записей).
     (b)Обновляют поля или удаляют запись через db.session.delete().
     (c)После операций перенаправляют на отчёты.
@@ -99,12 +102,14 @@ def index():
 5. Передаёт данные в reports.html для отображения таблицы и пагинации.
 
 ## 4 Вспомогательные функции
-def create_default_categories(user_id):
-    defaults = [('Зарплата', 'income'), ('Еда', 'expense'), ...]
-    for name, type_ in defaults:
-        category = Category(user_id=user_id, name=name, type=type_)
-        db.session.add(category)
-    db.session.commit()
+```
+    def create_default_categories(user_id):
+        defaults = [('Зарплата', 'income'), ('Еда', 'expense'), ...]
+        for name, type_ in defaults:
+            category = Category(user_id=user_id, name=name, type=type_)
+            db.session.add(category)
+        db.session.commit()
+```
 
 Для чего: Автоматически создаёт базовый набор категорий при регистрации. Это улучшает UX: пользователю не нужно вручную добавлять "Еду", "Транспорт" и т.д. перед первой записью.
 
@@ -122,39 +127,53 @@ def create_default_categories(user_id):
 __Назначение__
 Централизованное хранение конфигурации Flask-приложения. Отделяет настройки от бизнес-логики, обеспечивает безопасную работу с секретами через переменные окружения и формирует строку подключения к базе данных.
 
-import os
-from dotenv import load_dotenv
-    1. **os** – стандартный модуль для работы с путями файловой системы.
-    2. **load_dotenv** – загружает переменные из файла .env в os.environ, чтобы приложение могло их читать.
+```
+    import os
+    from dotenv import load_dotenv
+```
+1. **os** – стандартный модуль для работы с путями файловой системы.
+2. **load_dotenv** – загружает переменные из файла .env в os.environ, чтобы приложение могло их читать.
 
-BASE_DIR = os.path.abspath(os.path.dirname(file))
-PROJECT_ROOT = os.path.dirname(BASE_DIR)
-ENV_PATH = os.path.join(PROJECT_ROOT, 'base', '.env')
-load_dotenv(ENV_PATH)
-    __Для чего:__ Вычисляет абсолютный путь до корня проекта, чтобы .env загружался независимо от того, из какой директории запускается скрипт.
+```
+    BASE_DIR = os.path.abspath(os.path.dirname(file))
+    PROJECT_ROOT = os.path.dirname(BASE_DIR)
+    ENV_PATH = os.path.join(PROJECT_ROOT, 'base', '.env')
+    load_dotenv(ENV_PATH)
+```
+__Для чего:__ Вычисляет абсолютный путь до корня проекта, чтобы .env загружался независимо от того, из какой директории запускается скрипт.
 
+```
 class Config:
 SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-production'
-    __Для чего__: SECRET_KEY используется Flask для подписи cookies, сессий и защиты от CSRF. В продакшене обязательно должен быть случайной строкой, храниться только в .env.
+```
+__Для чего__: SECRET_KEY используется Flask для подписи cookies, сессий и защиты от CSRF. В продакшене обязательно должен быть случайной строкой, храниться только в .env.
 
-MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+```
+    MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+```
+
 __остальные переменные с дефолтами__
+```
 SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
 SQLALCHEMY_TRACK_MODIFICATIONS = False
-    __Для чего__: Формирует URI для SQLAlchemy. Префикс mysql+pymysql указывает на использование драйвера PyMySQL.
-    __SQLALCHEMY_TRACK_MODIFICATIONS = False__ отключает отслеживание изменений объектов ORM, что экономит оперативную память и повышает производительность.
+```
+__Для чего__: Формирует URI для SQLAlchemy. Префикс mysql+pymysql указывает на использование драйвера PyMySQL.
+__SQLALCHEMY_TRACK_MODIFICATIONS = False__ отключает отслеживание изменений объектов ORM, что экономит оперативную память и повышает производительность.
 
-UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
+```
+    UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
+```
 __Для чего__: Резервирует папку для будущих функций загрузки файлов (аватары, чеки, экспорт отчётов).
 
 # forms.py – Валидация и обработка пользовательского ввода
 __Назначение__
 Описывает структуры веб-форм с помощью Flask-WTF/WTForms. Обеспечивает автоматическую CSRF-защиту, валидацию данных на сервере, безопасное преобразование типов и динамическое наполнение выпадающих списков.
 
-from flask_wtf import FlaskForm
+```from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, DecimalField, ...
-from wtforms.validators import DataRequired, Email, EqualTo, ...
-    __Для чего__: FlaskForm автоматически добавляет скрытое поле csrf_token в каждую форму. validators проверяют данные до попадания в бизнес-логику.
+from wtforms.validators import DataRequired, Email, EqualTo, ...```
+
+__Для чего__: FlaskForm автоматически добавляет скрытое поле csrf_token в каждую форму. validators проверяют данные до попадания в бизнес-логику.
 
 __LoginForm__ и __RegistrationForm__
 1. DataRequired, Length, Email – базовые проверки формата и обязательности.
